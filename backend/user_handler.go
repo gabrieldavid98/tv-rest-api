@@ -1,9 +1,13 @@
 package backend
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
+	"time"
 	"tv-rest-api/entities"
+
+	_ "github.com/lib/pq"
 
 	validator "github.com/go-playground/validator/v10"
 )
@@ -20,15 +24,31 @@ type userHandler struct {
 
 // SaveUser handles the request for the end point [POST] /user
 func (u *userHandler) SaveUser(w http.ResponseWriter, r *http.Request) {
-	// TODO: db connection
+	db, err := sql.Open("postgres", u.connString)
+	if err != nil {
+		internalServerError(w, newGenericErrorResponse("Something went wrong :("))
+		return
+	}
+
+	defer db.Close()
+
 	var user entities.User
 	if err := JSON.NewDecoder(r.Body).Decode(&user); err != nil {
 		badRequest(w, newGenericErrorResponse("The data could not be processed"))
 		return
 	}
 
+	var birthDate interface{}
+	if user.BirthDate != "" {
+		birthDate, err = time.Parse("02-01-2006", user.BirthDate)
+		if err != nil {
+			badRequest(w, newGenericErrorResponse("The field birthDate has incorrect format, it should be dd-mm-yyyy"))
+			return
+		}
+	}
+
 	validate := validator.New()
-	err := validate.Struct(user)
+	err = validate.Struct(user)
 
 	if err != nil {
 		if err, ok := err.(*validator.InvalidValidationError); ok {
@@ -72,6 +92,17 @@ func (u *userHandler) SaveUser(w http.ResponseWriter, r *http.Request) {
 		}
 
 		badRequest(w, newGenericErrorResponse(erros...))
+		return
+	}
+
+	var userid int
+	err = db.QueryRow(`
+		INSERT INTO Users (full_name, identification, birth_date)
+		VALUES ($1, $2, $3) RETURNING id_user
+	`, user.FullName, user.Identification, birthDate).Scan(&userid)
+
+	if err != nil {
+		internalServerError(w, newGenericErrorResponse(err.Error()))
 		return
 	}
 
