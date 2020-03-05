@@ -52,7 +52,7 @@ func (u *userHandler) SaveUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err, ok := err.(*validator.InvalidValidationError); ok {
-			internalServerError(w, newGenericErrorResponse(err.Error()))
+			internalServerError(w, newGenericErrorResponse("Something went wrong :("))
 			return
 		}
 
@@ -102,7 +102,7 @@ func (u *userHandler) SaveUser(w http.ResponseWriter, r *http.Request) {
 	`, user.FullName, user.Identification, birthDate).Scan(&userid)
 
 	if err != nil {
-		internalServerError(w, newGenericErrorResponse(err.Error()))
+		internalServerError(w, newGenericErrorResponse("Something went wrong :("))
 		return
 	}
 
